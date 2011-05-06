@@ -40,6 +40,8 @@ int toggleState = 0;    // state of the toggling LED
 long toggleTime = 0;    // delay time of the toggling LED
 byte tag[4];            // tag serial numbers are 4 bytes long
 
+byte responseBuffer[256];
+
 void setup() {           
   Wire.begin();                      // join i2c bus  
   Serial.begin(9600);                // set up serial port
@@ -61,19 +63,54 @@ void setup() {
 
 
 void loop() {
-  seekNewTag(); 
+  
+  
+  if (Serial.available() > 0) {
+    // read the latest byte:
+    char incomingByte = Serial.read();   
+    switch (incomingByte) {
+    case 's':            // Look for a new tag
+      seekNewTag();
+      break;  
+    }
+  }
 
   // delay before next command to the reader:
   delay(200);
 }
 
-int authenticate(int block) {
-  
-  byte valid = 0;
-  byte byteFromReader = 0;
-  
-  Serial.println("== Beginning authentication");
+void seekNewTag() {
+  Serial.println("READY");
+  while(getTag() == 0){
+    // wait for tag
+    if (millis() - toggleTime > 1000) {
+      toggle(waitingLED); 
+      toggleTime  = millis();
+    }
+    // unless you get a byte of serial data,
+    if (Serial. available()) {
+      // break out of the while loop 
+      // and out of the seekNewTag() method:
+      return;
+    }
+  }
+  if (authenticate(4)) {
+    delay(100);
+    
+    if (readBlock(4) == 20) {
+      char length = responseBuffer[9];
+      Serial.println(length, HEX);
+      delay(100);
+      if(readBlock(5) == 20) {
+        blink(successLED, 100, 1);
+      }
+    }
+  }
 
+}
+
+int authenticate(int block) {
+    
   int length = 9;
   int command[] = {
     0x85,  // authenticate
@@ -88,29 +125,18 @@ int authenticate(int block) {
   };  
   sendCommand(command, length);  
   
-  Wire.requestFrom(0x42, 4); // get response (4 bytes) from reader
-
-  while(Wire.available())  { // while data is coming from the reader
-    byteFromReader = Wire.receive();
-    Serial.println(byteFromReader, HEX);
-    if (byteFromReader == 0x4C) { 
-      Serial.println("Authentication OK");
-      valid = 1;
-    }
-    if (byteFromReader == 0x4E) { 
-      Serial.println("Authentication failed");
-      valid = 0;
-    }
-  }  
-  return valid;
+  getResponse(4);
+  if (responseBuffer[2] == 0x4C) {
+    return 1;
+  } else {
+    // No tag or login failed
+    return 0;
+  }
+  
 }
 
 int readBlock(int block) {
   
-  byte valid = 0;
-  byte byteFromReader = 0;
-  Serial.println("== Reading block");
-
   int length = 2;
   int command[] = {
     0x86,  // read block
@@ -118,22 +144,16 @@ int readBlock(int block) {
   };
   sendCommand(command, length);  
 
+  int count = getResponse(20);  // get 20 bytes (3 response + 16 data + checksum)
+  if (responseBuffer[2] == 0x4E) {
+    // No tag present
+    return 0;
+  } else if (responseBuffer[2] == 0x46) {
+    // Read failed
+    return 0;
+  }
 
-  Wire.requestFrom(0x42, 20); // get 20 bytes (3 response + 16 data + checksum)
-
-  while(Wire.available())  { // while data is coming from the reader
-    byteFromReader = Wire.receive();
-    Serial.println(byteFromReader, HEX);
-    if (byteFromReader == 0x4E) { 
-      Serial.println("No tag present");
-      valid = 0;
-    }
-    if (byteFromReader == 0x46) { 
-      Serial.println("Read failed");
-      valid = 0;
-    }
-  }  
-  return valid;
+  return count;
 }
 
 int getTag(){
@@ -147,31 +167,13 @@ int getTag(){
   };
   sendCommand(command, length);  
 
-  Wire.requestFrom(0x42, 8); // get data (8 bytes) from reader
+  getResponse(8); // get data (8 bytes) from reader
+  if (responseBuffer[0] == 2) {
+    return 0;
+  } else {
+    return 1;
+  }
 
-  count = 0;                 // keeps track of which byte it is in the response from the reader
-  valid = 0;                 // used to indicate that there is a tag there   
-  while(Wire.available())  { // while data is coming from the reader
-    byteFromReader = Wire.receive();
-    // no RFID found: reader sends character 2:
-    if ((count == 0) && (byteFromReader == 2)) { 
-      return(0);
-    }
-    if ((count == 0) && (byteFromReader== 6)) {
-      //if reader sends 6, the tag serial number is coming:
-      valid = 1;                                   
-    }
-    count++;
-
-    if ((valid == 1) && (count > 3) && (count < 8)) {
-      // strip out the header bytes  :
-      tag[count-4] = byteFromReader;            
-    }
-    // all four bytes received: tag serial number complete:
-    if ((valid == 1) && (count == 8)) {         
-      return(1);
-    }
-  }  
 }
 
 void sendCommand(int command[], int length) {
@@ -189,29 +191,22 @@ void sendCommand(int command[], int length) {
   delay(100);
 }
 
-void seekNewTag() {
-  Serial.println("Waiting for card");
-  while(getTag() == 0){
-    // wait for tag
-    if (millis() - toggleTime > 1000) {
-      toggle(waitingLED); 
-      toggleTime  = millis();
-    }
-    // unless you get a byte of serial data,
-    if (Serial. available()) {
-      // break out of the while loop 
-      // and out of the seekNewTag() method:
-      return;
-    }
-  }
-  authenticate(4);
-  delay(100);
-  readBlock(4);
-  delay(100);
-  readBlock(5);
-  blink(successLED, 100, 1);
+int getResponse(int numBytes) {
+    
+  Wire.requestFrom(0x42, numBytes); // get response (4 bytes) from reader
+
+  int count = 0;
+  while(Wire.available())  { // while data is coming from the reader
+    byte read = Wire.receive();
+    responseBuffer[count++] = read;
+  }  
+  responseBuffer[count] = 0;
+  
+        Serial.println(count, DEC);
+  return count;
 
 }
+
 
 
 void toggle(int thisLED) {
