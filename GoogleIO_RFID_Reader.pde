@@ -73,7 +73,7 @@ int authenticate(int block) {
   byte byteFromReader = 0;
   
   Serial.println("== Beginning authentication");
-  Wire.beginTransmission(0x42); 
+
   int length = 9;
   int command[] = {
     0x85,  // authenticate
@@ -85,19 +85,9 @@ int authenticate(int block) {
     0xFF,
     0xFF,
     0xFF,
-  };
+  };  
+  sendCommand(command, length);  
   
-  int checksum = length;
-  Wire.send(length);
-  for (int i = 0; i < length; i++) {
-    checksum += command[i];
-    Wire.send(command[i]);
-  }
-  checksum = checksum % 256;
-  Wire.send(checksum);
-  Wire.endTransmission();
-
-  delay(100);
   Wire.requestFrom(0x42, 4); // get response (4 bytes) from reader
 
   while(Wire.available())  { // while data is coming from the reader
@@ -121,24 +111,14 @@ int readBlock(int block) {
   byte byteFromReader = 0;
   Serial.println("== Reading block");
 
-  Wire.beginTransmission(0x42); 
   int length = 2;
   int command[] = {
     0x86,  // read block
     block, 
   };
-  
-  int checksum = length;
-  Wire.send(length);
-  for (int i = 0; i < length; i++) {
-    checksum += command[i];
-    Wire.send(command[i]);
-  }
-  checksum = checksum % 256;
-  Wire.send(checksum);
-  Wire.endTransmission();
+  sendCommand(command, length);  
 
-  delay(250);
+
   Wire.requestFrom(0x42, 20); // get 20 bytes (3 response + 16 data + checksum)
 
   while(Wire.available())  { // while data is coming from the reader
@@ -161,13 +141,12 @@ int getTag(){
   byte valid = 0;
   byte byteFromReader = 0;
 
-  Wire.beginTransmission(0x42);
-  Wire.send(0x01);           // Length
-  Wire.send(0x82);           // Seek for tags
-  Wire.send(0x83);           // Checksum
-  Wire.endTransmission();
+  int length = 1;
+  int command[] = {
+    0x82,  // Seek for tags
+  };
+  sendCommand(command, length);  
 
-  delay(250);
   Wire.requestFrom(0x42, 8); // get data (8 bytes) from reader
 
   count = 0;                 // keeps track of which byte it is in the response from the reader
@@ -193,6 +172,21 @@ int getTag(){
       return(1);
     }
   }  
+}
+
+void sendCommand(int bytes[], int length) {
+
+  Wire.beginTransmission(0x42); 
+  int checksum = length;
+  Wire.send(length);
+  for (int i = 0; i < length; i++) {
+    checksum += command[i];
+    Wire.send(command[i]);
+  }
+  checksum = checksum % 256;
+  Wire.send(checksum);
+  Wire.endTransmission();
+  delay(100);
 }
 
 void seekNewTag() {
