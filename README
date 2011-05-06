@@ -1,0 +1,18 @@
+This example reads an NDEF message from an RFID tag that was previously
+written from a Nexus S running the NXP TagWriter app.
+
+You must configure your Arduino consistent with the instructions in Tom Igoe's
+Arduino-based RFID reader: http://www.tigoe.net/pcomp/code/PHP/347#more-347
+
+Rough notes:
+
+1) Get a Mifare 1K tag.
+2) Get a Nexus S.
+3) Make sure your Nexus S is running Android 2.3.3 or higher.
+4) Install the NXP TagWriter app and write to your tag with it (tap Create,
+   choose some content to write to the tag, then bring your Mifare tag within
+   range, and confirm the operation).
+5) Upload the example to your Arduino (be sure everything is set up like Tom's
+   example). Open Arduino's Serial Monitor.
+6) Hold the tag to the reader and keep it still until you see useful and
+   correct data in the Arduino Serial Monitor.
