@@ -67,7 +67,7 @@ void loop() {
   delay(200);
 }
 
-int authenticate() {
+int authenticate(int block) {
   
   byte valid = 0;
   byte byteFromReader = 0;
@@ -77,7 +77,7 @@ int authenticate() {
   int length = 9;
   int command[] = {
     0x85,  // authenticate
-    0x04,  // Block number 4
+    block,
     0xBB,  // Key B
     0xFF,  // The rest are the keys
     0xFF,
@@ -98,7 +98,7 @@ int authenticate() {
   Wire.endTransmission();
 
   delay(100);
-  Wire.requestFrom(0x42, 4); // get data (6 bytes) from reader
+  Wire.requestFrom(0x42, 4); // get response (4 bytes) from reader
 
   while(Wire.available())  { // while data is coming from the reader
     byteFromReader = Wire.receive();
@@ -115,7 +115,7 @@ int authenticate() {
   return valid;
 }
 
-int readBlock() {
+int readBlock(int block) {
   
   byte valid = 0;
   byte byteFromReader = 0;
@@ -125,7 +125,7 @@ int readBlock() {
   int length = 2;
   int command[] = {
     0x86,  // read block
-    0x04,  // Block number 4
+    block, 
   };
   
   int checksum = length;
@@ -139,7 +139,7 @@ int readBlock() {
   Wire.endTransmission();
 
   delay(250);
-  Wire.requestFrom(0x42, 16); // get data (8 bytes) from reader
+  Wire.requestFrom(0x42, 20); // get 20 bytes (3 response + 16 data + checksum)
 
   while(Wire.available())  { // while data is coming from the reader
     byteFromReader = Wire.receive();
@@ -210,8 +210,11 @@ void seekNewTag() {
       return;
     }
   }
-  authenticate();
-  readBlock();
+  authenticate(4);
+  delay(100);
+  readBlock(4);
+  delay(100);
+  readBlock(5);
   blink(successLED, 100, 1);
 
 }
