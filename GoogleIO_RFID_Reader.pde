@@ -174,7 +174,7 @@ int getTag(){
   }  
 }
 
-void sendCommand(int bytes[], int length) {
+void sendCommand(int command[], int length) {
 
   Wire.beginTransmission(0x42); 
   int checksum = length;
