@@ -63,8 +63,8 @@ void setup() {
 
 
 void loop() {
-  
-  
+
+
   if (Serial.available() > 0) {
     // read the latest byte:
     char incomingByte = Serial.read();   
@@ -94,23 +94,25 @@ void seekNewTag() {
       return;
     }
   }
-  if (authenticate(4)) {
+  
+  if (!authenticate(4)) {
+    Serial.println("F"); // Authentication Failed
+  } 
+  else {
+
     delay(100);
-    
-    if (readBlock(4) == 20) {
-      char length = responseBuffer[9];
-      Serial.println(length, HEX);
-      delay(100);
-      if(readBlock(5) == 20) {
-        blink(successLED, 100, 1);
-      }
+    String payload = getPayload(4);
+    if (payload.length() > 0) {
+      blink(successLED, 100, 1);
+      Serial.println("U" + payload); 
     }
   }
 
 }
 
+
 int authenticate(int block) {
-    
+
   int length = 9;
   int command[] = {
     0x85,  // authenticate
@@ -124,19 +126,20 @@ int authenticate(int block) {
     0xFF,
   };  
   sendCommand(command, length);  
-  
+
   getResponse(4);
   if (responseBuffer[2] == 0x4C) {
     return 1;
-  } else {
+  } 
+  else {
     // No tag or login failed
     return 0;
   }
-  
+
 }
 
 int readBlock(int block) {
-  
+
   int length = 2;
   int command[] = {
     0x86,  // read block
@@ -148,7 +151,8 @@ int readBlock(int block) {
   if (responseBuffer[2] == 0x4E) {
     // No tag present
     return 0;
-  } else if (responseBuffer[2] == 0x46) {
+  } 
+  else if (responseBuffer[2] == 0x46) {
     // Read failed
     return 0;
   }
@@ -170,7 +174,8 @@ int getTag(){
   getResponse(8); // get data (8 bytes) from reader
   if (responseBuffer[0] == 2) {
     return 0;
-  } else {
+  } 
+  else {
     return 1;
   }
 
@@ -192,7 +197,7 @@ void sendCommand(int command[], int length) {
 }
 
 int getResponse(int numBytes) {
-    
+
   Wire.requestFrom(0x42, numBytes); // get response (4 bytes) from reader
 
   int count = 0;
@@ -201,12 +206,38 @@ int getResponse(int numBytes) {
     responseBuffer[count++] = read;
   }  
   responseBuffer[count] = 0;
-  
-        Serial.println(count, DEC);
+
   return count;
 
 }
 
+String getPayload(int startBlock) {
+
+  int length = 0;
+  String payLoad = "";
+
+  int startByte = 0;
+  for (int i = 0; i < 3; i++) { // Check all three blocks
+
+    if (readBlock(startBlock + i) == 20) {
+      if (i == 0) {
+        length = responseBuffer[9];
+        startByte = 11;  // offset of payload in first block
+      } 
+      else {
+        startByte = 3;  // ofset of payload in next 2 blocks
+      }
+
+      for (int j = startByte; j < 19; j++) {
+        if (length-- > 0) { // Keep adding characters until we reach the length.
+          payLoad += responseBuffer[j];
+        }
+      }
+
+    }
+  }
+  return payLoad;
+}
 
 
 void toggle(int thisLED) {
@@ -222,4 +253,7 @@ void blink(int thisLED, int interval, int count) {
     delay(interval/2);
   }
 }
+
+
+
 
