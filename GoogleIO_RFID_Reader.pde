@@ -80,7 +80,7 @@ void loop() {
 }
 
 void seekNewTag() {
-  Serial.println("READY");
+  Serial.print("READY");
   while(getTag() == 0){
     // wait for tag
     if (millis() - toggleTime > 1000) {
@@ -96,7 +96,7 @@ void seekNewTag() {
   }
   
   if (!authenticate(4)) {
-    Serial.println("F"); // Authentication Failed
+    Serial.print("F"); // Authentication Failed
   } 
   else {
 
@@ -104,7 +104,8 @@ void seekNewTag() {
     String payload = getPayload(4);
     if (payload.length() > 0) {
       blink(successLED, 100, 1);
-      Serial.println("U" + payload); 
+      Serial.print('U');
+      Serial.print(payload); 
     }
   }
 
@@ -222,7 +223,7 @@ String getPayload(int startBlock) {
     if (readBlock(startBlock + i) == 20) {
       if (i == 0) {
         length = responseBuffer[9];
-        startByte = 11;  // offset of payload in first block
+        startByte = 12;  // offset of payload in first block
       } 
       else {
         startByte = 3;  // ofset of payload in next 2 blocks
