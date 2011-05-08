@@ -1,23 +1,23 @@
 /*
-Arduino RFID SM130 reader example 
+ Arduino RFID SM130 NDEF reader
+
+ May 2011
+ Brian Jepson
  
- This program implements an RFID card reader and on-chip storage system
- RFID tags are saved to the database by sending a "n" character serially to the Arduino
- Tags subsequently presented to the reader are checked to see if they are the database 
+ This program will seek for tags when it is given the command 's' over serial.
+ It will then attempt to read the NDEF-formatted URL in Sector 1, and sends the
+ payload (prefixed by a U) over the serial port. 
  
- The database is saved in EEPROM so that it is available after a reset or power cycle
- The complete database is erased by typing "c". 
- Individual cards are erased by typing "d", then presenting the RFID tag.
- The list of tags in the database can be seen by typing "p"
+ It can also be told to turn a success LED on (+) or a failure LED on (-).
  
+ This example cannot read NDEF messages that span multiple sectors.
+ 
+ Based on Arduino RFID SM130 reader example
  created May 2008
  by Alex Zivanovic (www.zivanovic.co.uk)
- 
  modified March 2009
  by Tom Igoe
  
- modified May 2011
- by Brian Jepson
  */
 
 #include <Wire.h>

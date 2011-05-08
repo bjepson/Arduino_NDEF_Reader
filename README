@@ -1,4 +1,4 @@
-This example reads an NDEF message from an RFID tag that was previously
+This example reads an NDEF URI message from an RFID tag that was previously
 written from a Nexus S running the NXP TagWriter app.
 
 You must configure your Arduino consistent with the instructions in Tom Igoe's
@@ -13,6 +13,8 @@ Rough notes:
    choose some content to write to the tag, then bring your Mifare tag within
    range, and confirm the operation).
 5) Upload the example to your Arduino (be sure everything is set up like Tom's
-   example). Open Arduino's Serial Monitor.
-6) Hold the tag to the reader and keep it still until you see useful and
-   correct data in the Arduino Serial Monitor.
+   example). 
+6) Open Arduino's Serial Monitor and type 's' to tell the Arduino to 
+   start seeking.
+7) Hold the tag to the reader and keep it still until you see results in the
+   serial monitory.
