@@ -23,14 +23,6 @@ Arduino RFID SM130 reader example
 #include <Wire.h>
 #include <EEPROM.h>
 
-// There are 512 bytes of EEPROM available. The data stored there 
-//remains when the Arduino is switched off or reset
-// Each tag uses 5 bytes (1 byte status, 4 bytes tag number), 
-//so 512 / 5 = 102 cards may be stored
-
-#define MAX_NO_CARDS 102 
-
-
 // define the LED pins:
 #define waitingLED 7
 #define successLED 8
@@ -38,9 +30,11 @@ Arduino RFID SM130 reader example
 
 int toggleState = 0;    // state of the toggling LED
 long toggleTime = 0;    // delay time of the toggling LED
-byte tag[4];            // tag serial numbers are 4 bytes long
 
-byte responseBuffer[256];
+int payloadSector = 1; // which sector to read
+int payloadBlock  = payloadSector * 4;
+
+byte responseBuffer[256]; // To hold the last response from the reader
 
 void setup() {           
   Wire.begin();                      // join i2c bus  
@@ -59,13 +53,15 @@ void setup() {
 
   // delay to allow reader startup time:
   delay(2000);
+  
+  // FIXME - send something out over serial when we're warmed up.
 } 
 
 
 void loop() {
 
-
   if (Serial.available() > 0) {
+    
     // read the latest byte:
     char incomingByte = Serial.read();   
     switch (incomingByte) {
@@ -86,40 +82,48 @@ void loop() {
 }
 
 void seekNewTag() {
+  
+  // Clear the indicator LEDs
   digitalWrite(failureLED, LOW);
   digitalWrite(successLED, LOW);
 
-  Serial.print("READY");
+  Serial.print("READY"); // FIXME--change to something that indicates we're seeking. 
   while(getTag() == 0){
     // wait for tag
     if (millis() - toggleTime > 1000) {
       toggle(waitingLED); 
       toggleTime  = millis();
     }
-    // unless you get a byte of serial data,
-    if (Serial. available()) {
-      // break out of the while loop 
+    // If you get a byte of serial data, we've received another command.
+    if (Serial.available()) {
+      // So, break out of the while loop 
       // and out of the seekNewTag() method:
       return;
     }
   }
 
-  if (!authenticate(4)) {
-    Serial.print("F"); // Authentication Failed
-  } 
-  else {
-
-    delay(100);
-    String payload = getPayload(4);
+  // Try to authenticate
+  //
+  if (authenticate(payloadBlock)) {
+    delay(100); // give it a moment
+    
+    // Read the payload contained in this sector.
+    String payload = getPayload(payloadBlock);
     if (payload.length() > 0) {
+      // Return the payload to the client
       Serial.print('U');
       Serial.print(payload); 
     }
+  } 
+  else {
+    Serial.print("F"); // Authentication Failed
   }
 
 }
 
 
+// Authenticate yourself to the tag.
+//
 int authenticate(int block) {
 
   int length = 9;
@@ -147,6 +151,65 @@ int authenticate(int block) {
 
 }
 
+// Seek for tags. 
+int getTag(){
+  byte count = 0;
+  byte valid = 0;
+  byte byteFromReader = 0;
+
+  int length = 1;
+  int command[] = {
+    0x82,  // Seek for tags
+  };
+  sendCommand(command, length);  
+
+  getResponse(8); // get data (8 bytes) from reader
+  if (responseBuffer[0] == 2) {
+    return 0;
+  } 
+  else {
+    return 1;
+  }
+
+}
+
+// Read a single-sector payload. The reader sends back a response that
+// includes 3 bytes (data length, command, block number) in addition 
+// to 16 bytes of data, for a total of 19 bytes. In the first block,
+// the payload starts after a bunch of other block metadata. In the 
+// remaining blocks, the payload continues immediately after those 3
+// initial bytes.
+//
+String getPayload(int startBlock) {
+
+  int length = 0;
+  String payLoad = "";
+
+  int startByte = 0;
+  for (int i = 0; i < 3; i++) { // Check all three blocks
+
+    if (readBlock(startBlock + i) == 20) {
+      if (i == 0) {
+        length = responseBuffer[9];
+        startByte = 12;  // offset of payload in first block response
+      } 
+      else {
+        startByte = 3;  // ofset of payload in next 2 block responses
+      }
+
+      for (int j = startByte; j < 19; j++) {
+        if (--length > 0) { // Keep adding characters until we reach the length.
+          payLoad += responseBuffer[j];
+        }
+      }
+
+    }
+  }
+  return payLoad;
+}
+
+// Read a block. You need to authenticate() before you can call this.
+//
 int readBlock(int block) {
 
   int length = 2;
@@ -169,42 +232,30 @@ int readBlock(int block) {
   return count;
 }
 
-int getTag(){
-  byte count = 0;
-  byte valid = 0;
-  byte byteFromReader = 0;
-
-  int length = 1;
-  int command[] = {
-    0x82,  // Seek for tags
-  };
-  sendCommand(command, length);  
-
-  getResponse(8); // get data (8 bytes) from reader
-  if (responseBuffer[0] == 2) {
-    return 0;
-  } 
-  else {
-    return 1;
-  }
-
-}
-
+// Send a command to the reader
+//
 void sendCommand(int command[], int length) {
 
   Wire.beginTransmission(0x42); 
-  int checksum = length;
+  
+  int checksum = length; // Starting value for the checksum.
+  
   Wire.send(length);
+  
   for (int i = 0; i < length; i++) {
-    checksum += command[i];
+    checksum += command[i]; // Add each byte to the checksum
     Wire.send(command[i]);
   }
-  checksum = checksum % 256;
+  
+  checksum = checksum % 256; // mod the checksum then send it
   Wire.send(checksum);
+  
   Wire.endTransmission();
   delay(100);
 }
 
+// Retrieve a response from the reader.
+//
 int getResponse(int numBytes) {
 
   Wire.requestFrom(0x42, numBytes); // get response (4 bytes) from reader
@@ -220,40 +271,15 @@ int getResponse(int numBytes) {
 
 }
 
-String getPayload(int startBlock) {
-
-  int length = 0;
-  String payLoad = "";
-
-  int startByte = 0;
-  for (int i = 0; i < 3; i++) { // Check all three blocks
-
-    if (readBlock(startBlock + i) == 20) {
-      if (i == 0) {
-        length = responseBuffer[9];
-        startByte = 12;  // offset of payload in first block
-      } 
-      else {
-        startByte = 3;  // ofset of payload in next 2 blocks
-      }
-
-      for (int j = startByte; j < 19; j++) {
-        if (--length > 0) { // Keep adding characters until we reach the length.
-          payLoad += responseBuffer[j];
-        }
-      }
-
-    }
-  }
-  return payLoad;
-}
-
-
+// Toggle the LED.
+//
 void toggle(int thisLED) {
   toggleState = !toggleState;
   digitalWrite(thisLED, toggleState);
 }
 
+// Blink an LED.
+//
 void blink(int thisLED, int interval, int count) {
   for (int i = 0; i < count; i++) {
     digitalWrite(thisLED, HIGH);
@@ -262,9 +288,3 @@ void blink(int thisLED, int interval, int count) {
     delay(interval/2);
   }
 }
-
-
-
-
-
-
