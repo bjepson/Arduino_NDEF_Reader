@@ -72,6 +72,12 @@ void loop() {
     case 's':            // Look for a new tag
       seekNewTag();
       break;  
+    case '-': // you haven't tweeted!
+      digitalWrite(failureLED, HIGH);
+      break;
+    case '+': // good for you!
+      digitalWrite(successLED, HIGH);
+      break;
     }
   }
 
@@ -80,6 +86,9 @@ void loop() {
 }
 
 void seekNewTag() {
+  digitalWrite(failureLED, LOW);
+  digitalWrite(successLED, LOW);
+
   Serial.print("READY");
   while(getTag() == 0){
     // wait for tag
@@ -94,7 +103,7 @@ void seekNewTag() {
       return;
     }
   }
-  
+
   if (!authenticate(4)) {
     Serial.print("F"); // Authentication Failed
   } 
@@ -103,7 +112,6 @@ void seekNewTag() {
     delay(100);
     String payload = getPayload(4);
     if (payload.length() > 0) {
-      blink(successLED, 100, 1);
       Serial.print('U');
       Serial.print(payload); 
     }
@@ -230,7 +238,7 @@ String getPayload(int startBlock) {
       }
 
       for (int j = startByte; j < 19; j++) {
-        if (length-- > 0) { // Keep adding characters until we reach the length.
+        if (--length > 0) { // Keep adding characters until we reach the length.
           payLoad += responseBuffer[j];
         }
       }
@@ -254,6 +262,8 @@ void blink(int thisLED, int interval, int count) {
     delay(interval/2);
   }
 }
+
+
 
 
 
