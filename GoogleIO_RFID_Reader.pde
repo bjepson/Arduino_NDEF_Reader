@@ -113,6 +113,8 @@ void seekNewTag() {
       // Return the payload to the client
       Serial.print('U');
       Serial.print(payload); 
+    } else {
+      Serial.print("N"); // Got nothin' for ya pal
     }
   } 
   else {
