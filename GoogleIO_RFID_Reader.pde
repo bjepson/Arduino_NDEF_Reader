@@ -40,7 +40,7 @@ void setup() {
   Serial.begin(9600);                // set up serial port
 
   Wire.begin();                      // join i2c bus 
-  delay(2000);
+  delay(1500);
   
   Wire.beginTransmission(0x42);      // the RFID reader's address is 42
   Wire.send(0x01);                   // Length
@@ -49,7 +49,7 @@ void setup() {
   Wire.endTransmission();            
 
   // delay to allow reader startup time:
-  delay(3000);
+  delay(1500);
 
   // initialize the LEDs:
   pinMode(waitingLED, OUTPUT);
