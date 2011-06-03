@@ -37,22 +37,25 @@ int payloadBlock  = payloadSector * 4;
 byte responseBuffer[256]; // To hold the last response from the reader
 
 void setup() {           
-  Wire.begin();                      // join i2c bus  
   Serial.begin(9600);                // set up serial port
 
+  Wire.begin();                      // join i2c bus 
+  delay(2000);
+  
   Wire.beginTransmission(0x42);      // the RFID reader's address is 42
   Wire.send(0x01);                   // Length
   Wire.send(0x80);                   // reset reader 
   Wire.send(0x81);                   // Checksum
   Wire.endTransmission();            
 
+  // delay to allow reader startup time:
+  delay(3000);
+
   // initialize the LEDs:
   pinMode(waitingLED, OUTPUT);
   pinMode(successLED, OUTPUT);
   pinMode(failureLED, OUTPUT);
 
-  // delay to allow reader startup time:
-  delay(2000);
   
   // FIXME - send something out over serial when we're warmed up.
 } 
@@ -104,7 +107,8 @@ void seekNewTag() {
 
   // Try to authenticate
   //
-  if (authenticate(payloadBlock)) {
+  int result = authenticate(payloadBlock);
+  if (result > 0) {
     delay(100); // give it a moment
     
     // Read the payload contained in this sector.
@@ -140,23 +144,29 @@ int authenticate(int block) {
     0xFF,
     0xFF,
   };  
-  sendCommand(command, length);  
+  sendCommand(command, length); 
 
   getResponse(4);
   if (responseBuffer[2] == 0x4C) {
     return 1;
   } 
   else {
-    // No tag or login failed
-    return 0;
+    if (responseBuffer[2] == 0x4E) {
+      return 0; // no tag or login failed
+    }
+    if (responseBuffer[2] == 0x55) {
+      return -1; // login failed
+    }
+    if (responseBuffer[2] == 0x45) {
+      return -2; // invalid key format
+    }
   }
 
 }
 
 // Seek for tags. 
 int getTag(){
-  byte count = 0;
-  byte valid = 0;
+
   byte byteFromReader = 0;
 
   int length = 1;
@@ -165,11 +175,13 @@ int getTag(){
   };
   sendCommand(command, length);  
 
-  getResponse(8); // get data (8 bytes) from reader
-  if (responseBuffer[0] == 2) {
+  int count = getResponse(8); // get data (8 bytes) from reader
+  if (responseBuffer[2] == 0x4C) {
     return 0;
-  } 
-  else {
+  } else if (responseBuffer[2] == 0x55) {
+    //Serial.println("FIXME: you need to power up the RF field!");
+    return 0; // FIXME--need to power up the RF field!!
+  } else {
     return 1;
   }
 
@@ -201,7 +213,12 @@ String getPayload(int startBlock) {
 
       for (int j = startByte; j < 19; j++) {
         if (--length > 0) { // Keep adding characters until we reach the length.
-          payLoad += responseBuffer[j];
+          payLoad += (char) responseBuffer[j];
+          //Serial.print(j);
+          //Serial.print(" = ");
+          //Serial.write(responseBuffer[j]);
+          //Serial.println();
+
         }
       }
 
@@ -251,20 +268,30 @@ void sendCommand(int command[], int length) {
   
   checksum = checksum % 256; // mod the checksum then send it
   Wire.send(checksum);
-  
+
   Wire.endTransmission();
-  delay(100);
+  delay(25);
+  
 }
 
 // Retrieve a response from the reader.
 //
 int getResponse(int numBytes) {
 
-  Wire.requestFrom(0x42, numBytes); // get response (4 bytes) from reader
+  Wire.requestFrom(0x42, numBytes); // get response from reader
 
+  int c = 10;
+  while(!Wire.available() && c--) {
+   delay(50);
+  }
   int count = 0;
   while(Wire.available())  { // while data is coming from the reader
     byte read = Wire.receive();
+    //Serial.print(read, HEX);
+    //Serial.print(" = ");
+    //Serial.write(read);
+    //Serial.println("");
+    //delay(1);
     responseBuffer[count++] = read;
   }  
   responseBuffer[count] = 0;
