@@ -24,9 +24,9 @@
 #include <EEPROM.h>
 
 // define the LED pins:
-#define waitingLED 7
-#define successLED 8
-#define failureLED 9
+#define waitingLED 11
+#define failureLED 12
+#define successLED 13
 
 int toggleState = 0;    // state of the toggling LED
 long toggleTime = 0;    // delay time of the toggling LED
