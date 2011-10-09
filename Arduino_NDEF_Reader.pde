@@ -25,8 +25,8 @@
 
 // define the LED pins:
 #define waitingLED 11
-#define failureLED 12
-#define successLED 13
+#define successLED 12
+#define failureLED 13
 
 int toggleState = 0;    // state of the toggling LED
 long toggleTime = 0;    // delay time of the toggling LED
