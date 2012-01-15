@@ -43,9 +43,9 @@ void setup() {
   delay(1500);
   
   Wire.beginTransmission(0x42);      // the RFID reader's address is 42
-  Wire.send(0x01);                   // Length
-  Wire.send(0x80);                   // reset reader 
-  Wire.send(0x81);                   // Checksum
+  Wire.write(0x01);                   // Length
+  Wire.write(0x80);                   // reset reader 
+  Wire.write(0x81);                   // Checksum
   Wire.endTransmission();            
 
   // delay to allow reader startup time:
@@ -259,15 +259,15 @@ void sendCommand(int command[], int length) {
   
   int checksum = length; // Starting value for the checksum.
   
-  Wire.send(length);
+  Wire.write(length);
   
   for (int i = 0; i < length; i++) {
     checksum += command[i]; // Add each byte to the checksum
-    Wire.send(command[i]);
+    Wire.write(command[i]);
   }
   
   checksum = checksum % 256; // mod the checksum then send it
-  Wire.send(checksum);
+  Wire.write(checksum);
 
   Wire.endTransmission();
   delay(25);
@@ -286,7 +286,7 @@ int getResponse(int numBytes) {
   }
   int count = 0;
   while(Wire.available())  { // while data is coming from the reader
-    byte read = Wire.receive();
+    byte read = Wire.read();
     //Serial.print(read, HEX);
     //Serial.print(" = ");
     //Serial.write(read);

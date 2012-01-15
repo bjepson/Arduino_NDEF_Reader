@@ -1,3 +1,5 @@
+Requires Arduino 1.0
+
 This example reads an NDEF URI message from an RFID tag that was previously
 written from a Nexus S running the NXP TagWriter app.
 
